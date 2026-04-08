@@ -1,0 +1,12 @@
+[project]
+name = "visual-servoing"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "matplotlib>=3.10.8",
+    "numpy>=2.4.4",
+    "opencv-python>=4.13.0.92",
+    "pybullet>=3.2.7",
+]
