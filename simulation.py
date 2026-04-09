@@ -28,8 +28,13 @@ UR5_JOINT_NAMES = [
     "wrist_3_joint",
 ]
 
-# Initial joint configuration (arm pointing downward, ready to servo)
-UR5_HOME = [-1.5708, -1.5708, 1.5708, -1.5708, -1.5708, 0.0]
+# Initial joint configuration:
+# ee above workspace centre (~0.5, 0, 0.4), camera pointing straight down
+# Verified: cam local-Z in world = [0, 0, -1]
+UR5_HOME = [-0.22, -1.106, 1.072, 1.605, 1.571, -0.22]
+
+# XY position of end-effector at home (used to seed target placement)
+HOME_EE_XY = [0.5, 0.0]
 
 
 class Simulation:
@@ -86,9 +91,10 @@ class Simulation:
 
     def _load_target(self, position=None):
         if position is None:
-            # Random position in reachable workspace
-            x = np.random.uniform(0.3, 0.6)
-            y = np.random.uniform(-0.3, 0.3)
+            # Place target randomly around the home ee XY position so it
+            # starts inside the camera field of view
+            x = HOME_EE_XY[0] + np.random.uniform(-0.15, 0.15)
+            y = HOME_EE_XY[1] + np.random.uniform(-0.15, 0.15)
             z = 0.025  # resting on ground plane
             position = [x, y, z]
 
@@ -113,10 +119,20 @@ class Simulation:
         cam_pos = link_state[4]   # world position
         cam_orn = link_state[5]   # world orientation (quaternion)
 
-        # Camera forward direction: local +X after rpy="0 pi/2 0" mount
+        # Camera optical axis = local Z in world frame
         rot_mat = np.array(p.getMatrixFromQuaternion(cam_orn)).reshape(3, 3)
-        forward = rot_mat[:, 2]   # local Z in world frame = optical axis
-        up = rot_mat[:, 1] * -1   # local -Y as up
+        forward = rot_mat[:, 2]   # local Z → optical axis
+
+        # Choose an up vector that is never parallel to forward.
+        # When camera points straight down ([0,0,-1]), world-X is a safe up.
+        world_up = np.array([1.0, 0.0, 0.0])
+        if abs(np.dot(forward, world_up)) > 0.9:
+            world_up = np.array([0.0, 1.0, 0.0])
+        # Re-orthogonalise: right = forward × up, then up = right × forward
+        right = np.cross(forward, world_up)
+        right /= np.linalg.norm(right)
+        up = np.cross(right, forward)
+        up /= np.linalg.norm(up)
 
         target_pos = np.array(cam_pos) + forward
 
@@ -134,22 +150,29 @@ class Simulation:
         return rgb_array
 
     def get_jacobian(self):
-        joint_positions = [p.getJointState(self.robot_id, i)[0]
-                           for i in self.arm_joint_indices]
-        zero_vec = [0.0] * len(self.arm_joint_indices)
-
-        # Local position of camera in ee frame (from URDF camera_joint origin)
-        local_pos = [0.0, 0.0, 0.1]
+        # calculateJacobian requires vectors of length = numDof (all non-fixed joints)
+        # Build full-length position vector from current joint states
+        num_joints = p.getNumJoints(self.robot_id)
+        q_full, qd_full, qdd_full = [], [], []
+        for i in range(num_joints):
+            info = p.getJointInfo(self.robot_id, i)
+            if info[2] != p.JOINT_FIXED:
+                q_full.append(p.getJointState(self.robot_id, i)[0])
+                qd_full.append(0.0)
+                qdd_full.append(0.0)
 
         jac_lin, jac_rot = p.calculateJacobian(
             self.robot_id,
             self.camera_link_index,
-            local_pos,
-            joint_positions,
-            zero_vec,
-            zero_vec,
+            [0.0, 0.0, 0.0],   # local point on camera_link
+            q_full,
+            qd_full,
+            qdd_full,
         )
-        J = np.vstack([np.array(jac_lin), np.array(jac_rot)])  # (6, 6)
+        # jac_lin/jac_rot are (3, numDof=12); keep only the 6 arm-joint columns
+        jac_lin = np.array(jac_lin)[:, :6]   # (3, 6)
+        jac_rot = np.array(jac_rot)[:, :6]   # (3, 6)
+        J = np.vstack([jac_lin, jac_rot])     # (6, 6)
         return J
 
     def set_joint_velocities(self, q_dot, max_vel=1.0):
