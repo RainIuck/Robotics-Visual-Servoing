@@ -7,7 +7,10 @@ from controller import IBVSController
 from plotter import ErrorPlotter
 
 # ── Tunable parameters ────────────────────────────────────────────────────────
-LAMBDA       = 0.3    # IBVS proportional gain
+LAMBDA       = 0.003  # IBVS proportional gain
+              # v_c is in physical units (m/s, rad/s) while pixel errors are
+              # O(100 px).  With fx≈554 and Z≈0.5 m the effective gain on joint
+              # velocities is ~140×LAMBDA, so 0.003 keeps q_dot ≲ 0.5 rad/s.
 Z_EST        = 0.5    # estimated target depth from camera (metres)
 DAMPING      = 1e-4   # DLS damping coefficient
 CONVERGE_THR = 5.0    # pixel error threshold to trigger grasp (pixels)
@@ -49,9 +52,10 @@ def main():
         plotter.update(e)
 
         # ── Step 3: compute control ───────────────────────────────────────────
-        J   = sim.get_jacobian()
-        v_c = controller.compute_camera_velocity(s, s_star)
-        q_dot = controller.compute_joint_velocity(v_c, J)
+        J     = sim.get_jacobian()       # (6,6) world frame
+        T_wc  = sim.get_camera_frame()  # (6,6) camera→world velocity transform
+        v_c   = controller.compute_camera_velocity(s, s_star)
+        q_dot = controller.compute_joint_velocity(v_c, J, T_wc)
 
         # ── Step 4: drive joints ──────────────────────────────────────────────
         sim.set_joint_velocities(q_dot)

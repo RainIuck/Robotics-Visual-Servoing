@@ -172,8 +172,44 @@ class Simulation:
         # jac_lin/jac_rot are (3, numDof=12); keep only the 6 arm-joint columns
         jac_lin = np.array(jac_lin)[:, :6]   # (3, 6)
         jac_rot = np.array(jac_rot)[:, :6]   # (3, 6)
-        J = np.vstack([jac_lin, jac_rot])     # (6, 6)
+        J = np.vstack([jac_lin, jac_rot])     # (6, 6) — velocity in WORLD frame
         return J
+
+    def get_camera_frame(self):
+        """
+        Return a 6×6 matrix T_wc that maps camera-frame velocity to world-frame velocity.
+
+        PyBullet's calculateJacobian gives camera velocity expressed in the **world** frame,
+        but the IBVS interaction matrix is derived in the **camera** frame
+        (X = image-right, Y = image-down, Z = optical axis / forward).
+
+        Use T_wc to convert before applying the Jacobian pseudo-inverse:
+            v_world = T_wc @ v_cam
+            q_dot   = J_world_pinv @ v_world
+        """
+        link_state = p.getLinkState(self.robot_id, self.camera_link_index,
+                                    computeForwardKinematics=True)
+        cam_orn = link_state[5]
+        rot_mat = np.array(p.getMatrixFromQuaternion(cam_orn)).reshape(3, 3)
+
+        # Reconstruct the same rendering frame axes used in get_camera_image()
+        forward = rot_mat[:, 2]          # optical axis (cam local-Z in world)
+        world_up = np.array([1.0, 0.0, 0.0])
+        if abs(np.dot(forward, world_up)) > 0.9:
+            world_up = np.array([0.0, 1.0, 0.0])
+        right = np.cross(forward, world_up)
+        right /= np.linalg.norm(right)
+        up = np.cross(right, forward)
+        up /= np.linalg.norm(up)
+
+        # IBVS camera frame: X = right (image u↑), Y = -up (image v↑), Z = forward
+        # R_wc maps camera-frame vectors to world frame (columns = cam axes in world)
+        R_wc = np.column_stack([right, -up, forward])   # (3, 3)
+
+        T_wc = np.zeros((6, 6))
+        T_wc[:3, :3] = R_wc   # linear velocity transform
+        T_wc[3:, 3:] = R_wc   # angular velocity transform
+        return T_wc
 
     def set_joint_velocities(self, q_dot, max_vel=1.0):
         q_dot = np.clip(q_dot, -max_vel, max_vel)
