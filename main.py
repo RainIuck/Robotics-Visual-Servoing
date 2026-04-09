@@ -79,11 +79,9 @@ def main():
         if controller.is_converged(s, s_star, CONVERGE_THR):
             print(f"[IBVS] Converged at step {step}! ||e|| = {np.linalg.norm(e):.2f} px")
             sim.set_joint_velocities(np.zeros(6))
-            for _ in range(60):
+            for _ in range(30):
                 sim.step()
-            sim.close_gripper()
-            for _ in range(120):
-                sim.step()
+            sim.execute_grasp_sequence()
             print("[IBVS] Grasp executed.")
             break
     else:

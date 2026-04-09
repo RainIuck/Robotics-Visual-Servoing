@@ -14,6 +14,7 @@ FX = IMG_W / (2 * math.tan(math.radians(FOV / 2)))
 FY = FX
 CX = IMG_W / 2.0
 CY = IMG_H / 2.0
+TARGET_HALF_EXTENTS = np.array([0.025, 0.025, 0.025])
 
 CAMERA_INTRINSICS = {"fx": FX, "fy": FY, "cx": CX, "cy": CY,
                      "width": IMG_W, "height": IMG_H}
@@ -51,6 +52,8 @@ class Simulation:
         self.gripper_joint_index = None
         self.camera_link_index = None
         self.ee_link_index = None
+        self.gripper_tip_link_index = None
+        self.grasp_constraint_id = None
 
         self._load_robot()
         self._load_target()
@@ -77,6 +80,8 @@ class Simulation:
                 self.camera_link_index = i
             if link_name == "ee_link":
                 self.ee_link_index = i
+            if link_name == "gripper_tip_link":
+                self.gripper_tip_link_index = i
 
         self.arm_joint_indices = [name_to_idx[n] for n in UR5_JOINT_NAMES]
         self.gripper_joint_index = name_to_idx.get("finger_joint")
@@ -99,8 +104,8 @@ class Simulation:
             position = [x, y, z]
 
         # Create a small red cube as target
-        col_id = p.createCollisionShape(p.GEOM_BOX, halfExtents=[0.025, 0.025, 0.025])
-        vis_id = p.createVisualShape(p.GEOM_BOX, halfExtents=[0.025, 0.025, 0.025],
+        col_id = p.createCollisionShape(p.GEOM_BOX, halfExtents=TARGET_HALF_EXTENTS.tolist())
+        vis_id = p.createVisualShape(p.GEOM_BOX, halfExtents=TARGET_HALF_EXTENTS.tolist(),
                                      rgbaColor=[1, 0, 0, 1])
         self.target_id = p.createMultiBody(
             baseMass=0.1,
@@ -210,6 +215,118 @@ class Simulation:
         T_wc[:3, :3] = R_wc   # linear velocity transform
         T_wc[3:, 3:] = R_wc   # angular velocity transform
         return T_wc
+
+    def get_target_position(self):
+        """Return target world position."""
+        if self.target_id is None:
+            raise RuntimeError("Target not loaded")
+        pos, _ = p.getBasePositionAndOrientation(self.target_id)
+        return np.array(pos)
+
+    def get_gripper_tip_pose(self):
+        """Return gripper tip world position and orientation."""
+        if self.gripper_tip_link_index is None:
+            raise RuntimeError("gripper_tip_link not found in URDF")
+        link_state = p.getLinkState(self.robot_id, self.gripper_tip_link_index,
+                                    computeForwardKinematics=True)
+        pos = np.array(link_state[4])
+        orn = np.array(link_state[5])
+        return pos, orn
+
+    def move_gripper_tip_linear(self, target_pos, steps=240, max_vel=0.25):
+        """Move gripper tip in a straight line using IK."""
+        target_pos = np.array(target_pos, dtype=float)
+        current_pos, current_orn = self.get_gripper_tip_pose()
+
+        for alpha in np.linspace(0.0, 1.0, steps):
+            interp_pos = (1.0 - alpha) * current_pos + alpha * target_pos
+            joint_targets = p.calculateInverseKinematics(
+                self.robot_id,
+                self.gripper_tip_link_index,
+                interp_pos.tolist(),
+                targetOrientation=current_orn.tolist(),
+                maxNumIterations=100,
+                residualThreshold=1e-4,
+            )
+            self._set_arm_joint_positions(joint_targets[:len(self.arm_joint_indices)], max_vel=max_vel)
+            self.step()
+
+        self.hold_current_pose()
+
+    def _set_arm_joint_positions(self, joint_targets, max_vel=0.25):
+        for idx, target in zip(self.arm_joint_indices, joint_targets):
+            p.setJointMotorControl2(
+                self.robot_id, idx,
+                controlMode=p.POSITION_CONTROL,
+                targetPosition=float(target),
+                maxVelocity=float(max_vel),
+                force=300.0,
+            )
+
+    def _release_grasp_constraint(self):
+        if self.grasp_constraint_id is not None:
+            p.removeConstraint(self.grasp_constraint_id)
+            self.grasp_constraint_id = None
+
+    def _attach_target_to_gripper(self):
+        """Rigidly attach target to the gripper tip after successful closure."""
+        self._release_grasp_constraint()
+        target_pos = self.get_target_position()
+        tip_pos, tip_orn = self.get_gripper_tip_pose()
+        parent_frame_pos, parent_frame_orn = p.multiplyTransforms(
+            p.invertTransform(tip_pos.tolist(), tip_orn.tolist())[0],
+            p.invertTransform(tip_pos.tolist(), tip_orn.tolist())[1],
+            target_pos.tolist(),
+            [0.0, 0.0, 0.0, 1.0],
+        )
+        self.grasp_constraint_id = p.createConstraint(
+            self.robot_id,
+            self.gripper_tip_link_index,
+            self.target_id,
+            -1,
+            p.JOINT_FIXED,
+            [0.0, 0.0, 0.0],
+            parent_frame_pos,
+            [0.0, 0.0, 0.0],
+            parentFrameOrientation=parent_frame_orn,
+            childFrameOrientation=[0.0, 0.0, 0.0, 1.0],
+        )
+
+    def hold_current_pose(self):
+        joint_states = p.getJointStates(self.robot_id, self.arm_joint_indices)
+        joint_positions = [state[0] for state in joint_states]
+        self._set_arm_joint_positions(joint_positions, max_vel=0.1)
+
+    def lift_after_grasp(self, distance=0.12, steps=240, max_vel=0.25):
+        """Lift gripper tip upward in world Z after grasping."""
+        current_pos, _ = self.get_gripper_tip_pose()
+        target_pos = current_pos + np.array([0.0, 0.0, distance])
+        self.move_gripper_tip_linear(target_pos, steps=steps, max_vel=max_vel)
+
+    def get_pregrasp_and_grasp_positions(self, clearance=0.14, descend_offset=0.055):
+        """Compute pregrasp and grasp positions above the target."""
+        target_pos = self.get_target_position()
+        pregrasp = target_pos + np.array([0.0, 0.0, clearance])
+        grasp = target_pos + np.array([0.0, 0.0, descend_offset])
+        return pregrasp, grasp
+
+    def execute_grasp_sequence(self, settle_steps=60):
+        """Descend, close gripper, and lift the target."""
+        pregrasp, grasp = self.get_pregrasp_and_grasp_positions(clearance=0.12, descend_offset=0.035)
+        print(f"[IBVS] Pre-grasp pose: {pregrasp}")
+        print(f"[IBVS] Grasp pose:     {grasp}")
+
+        self.move_gripper_tip_linear(pregrasp, steps=180, max_vel=0.3)
+        self.move_gripper_tip_linear(grasp, steps=220, max_vel=0.12)
+
+        self.close_gripper()
+        for _ in range(settle_steps * 4):
+            self.step()
+
+        self._attach_target_to_gripper()
+        self.lift_after_grasp(distance=0.16, steps=220, max_vel=0.18)
+        for _ in range(settle_steps):
+            self.step()
 
     def set_joint_velocities(self, q_dot, max_vel=1.0):
         q_dot = np.clip(q_dot, -max_vel, max_vel)
