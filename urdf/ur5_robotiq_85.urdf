@@ -211,8 +211,282 @@
     </collision>
   </link>
 
+  <!-- ################################################
+  ########          Robotiq 85 Gripper          #######
+  #################################################### -->
 
+  <joint name="robotiq_85_base_joint" type="fixed">
+    <parent link="ee_link"/>
+    <child link="robotiq_85_base_link"/>
+    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
+  </joint>
+  <link name="robotiq_85_base_link">
+    <visual>
+      <geometry>
+        <mesh filename="../meshes/robotiq_85/visual/robotiq_arg2f_85_base_link.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="../meshes/robotiq_85/collision/robotiq_arg2f_85_base_link.stl"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.636951"/>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <inertia ixx="0.000380" ixy="0.0" ixz="0.0" iyy="0.001110" iyz="0.0" izz="0.001171"/>
+    </inertial>
+  </link>
 
+  <!-- Left outer knuckle -->
+  <joint name="finger_joint" type="revolute">
+    <parent link="robotiq_85_base_link"/>
+    <child link="robotiq_85_left_outer_knuckle"/>
+    <origin rpy="0.0 0.0 0.0" xyz="-0.0306011 0.0 0.054904"/>
+    <axis xyz="0 1 0"/>
+    <limit effort="50" lower="0.0" upper="0.8" velocity="0.5"/>
+    <dynamics damping="0.1" friction="0.0"/>
+  </joint>
+  <link name="robotiq_85_left_outer_knuckle">
+    <visual>
+      <geometry>
+        <mesh filename="../meshes/robotiq_85/visual/robotiq_arg2f_85_outer_knuckle.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="../meshes/robotiq_85/collision/robotiq_arg2f_85_outer_knuckle.dae.convex.stl"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.018491"/>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <inertia ixx="0.000009" ixy="0.0" ixz="0.0" iyy="0.000009" iyz="0.0" izz="0.000015"/>
+    </inertial>
+  </link>
+
+  <!-- Left outer finger -->
+  <joint name="left_outer_finger_joint" type="fixed">
+    <parent link="robotiq_85_left_outer_knuckle"/>
+    <child link="robotiq_85_left_outer_finger"/>
+    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
+  </joint>
+  <link name="robotiq_85_left_outer_finger">
+    <visual>
+      <geometry>
+        <mesh filename="../meshes/robotiq_85/visual/robotiq_arg2f_85_outer_finger.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="../meshes/robotiq_85/collision/robotiq_arg2f_85_outer_finger.dae.convex.stl"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.027309"/>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <inertia ixx="0.000028" ixy="0.0" ixz="0.0" iyy="0.000025" iyz="0.0" izz="0.000009"/>
+    </inertial>
+  </link>
+
+  <!-- Left inner knuckle -->
+  <joint name="left_inner_knuckle_joint" type="revolute">
+    <parent link="robotiq_85_base_link"/>
+    <child link="robotiq_85_left_inner_knuckle"/>
+    <origin rpy="0.0 0.0 0.0" xyz="-0.0127 0.0 0.06142"/>
+    <axis xyz="0 1 0"/>
+    <limit effort="50" lower="0.0" upper="0.8" velocity="0.5"/>
+    <mimic joint="finger_joint" multiplier="1" offset="0"/>
+    <dynamics damping="0.1" friction="0.0"/>
+  </joint>
+  <link name="robotiq_85_left_inner_knuckle">
+    <visual>
+      <geometry>
+        <mesh filename="../meshes/robotiq_85/visual/robotiq_arg2f_85_inner_knuckle.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="../meshes/robotiq_85/collision/robotiq_arg2f_85_inner_knuckle.dae.convex.stl"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.029951"/>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <inertia ixx="0.000039" ixy="0.0" ixz="0.0" iyy="0.000031" iyz="0.0" izz="0.000015"/>
+    </inertial>
+  </link>
+
+  <!-- Left inner finger -->
+  <joint name="left_inner_finger_joint" type="revolute">
+    <parent link="robotiq_85_left_outer_knuckle"/>
+    <child link="robotiq_85_left_inner_finger"/>
+    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.09585"/>
+    <axis xyz="0 1 0"/>
+    <limit effort="50" lower="-0.8" upper="0.0" velocity="0.5"/>
+    <mimic joint="finger_joint" multiplier="-1" offset="0"/>
+    <dynamics damping="0.1" friction="0.0"/>
+  </joint>
+  <link name="robotiq_85_left_inner_finger">
+    <visual>
+      <geometry>
+        <mesh filename="../meshes/robotiq_85/visual/robotiq_arg2f_85_inner_finger.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="../meshes/robotiq_85/collision/robotiq_arg2f_85_inner_finger.dae.convex.stl"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.019555"/>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <inertia ixx="0.000003" ixy="0.0" ixz="0.0" iyy="0.000021" iyz="0.0" izz="0.000020"/>
+    </inertial>
+  </link>
+
+  <!-- Right outer knuckle -->
+  <joint name="right_outer_knuckle_joint" type="revolute">
+    <parent link="robotiq_85_base_link"/>
+    <child link="robotiq_85_right_outer_knuckle"/>
+    <origin rpy="0.0 3.14159265359 0.0" xyz="0.0306011 0.0 0.054904"/>
+    <axis xyz="0 1 0"/>
+    <limit effort="50" lower="0.0" upper="0.8" velocity="0.5"/>
+    <mimic joint="finger_joint" multiplier="1" offset="0"/>
+    <dynamics damping="0.1" friction="0.0"/>
+  </joint>
+  <link name="robotiq_85_right_outer_knuckle">
+    <visual>
+      <geometry>
+        <mesh filename="../meshes/robotiq_85/visual/robotiq_arg2f_85_outer_knuckle.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="../meshes/robotiq_85/collision/robotiq_arg2f_85_outer_knuckle.dae.convex.stl"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.018491"/>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <inertia ixx="0.000009" ixy="0.0" ixz="0.0" iyy="0.000009" iyz="0.0" izz="0.000015"/>
+    </inertial>
+  </link>
+
+  <!-- Right outer finger -->
+  <joint name="right_outer_finger_joint" type="fixed">
+    <parent link="robotiq_85_right_outer_knuckle"/>
+    <child link="robotiq_85_right_outer_finger"/>
+    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
+  </joint>
+  <link name="robotiq_85_right_outer_finger">
+    <visual>
+      <geometry>
+        <mesh filename="../meshes/robotiq_85/visual/robotiq_arg2f_85_outer_finger.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="../meshes/robotiq_85/collision/robotiq_arg2f_85_outer_finger.dae.convex.stl"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.027309"/>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <inertia ixx="0.000028" ixy="0.0" ixz="0.0" iyy="0.000025" iyz="0.0" izz="0.000009"/>
+    </inertial>
+  </link>
+
+  <!-- Right inner knuckle -->
+  <joint name="right_inner_knuckle_joint" type="revolute">
+    <parent link="robotiq_85_base_link"/>
+    <child link="robotiq_85_right_inner_knuckle"/>
+    <origin rpy="0.0 3.14159265359 0.0" xyz="0.0127 0.0 0.06142"/>
+    <axis xyz="0 1 0"/>
+    <limit effort="50" lower="0.0" upper="0.8" velocity="0.5"/>
+    <mimic joint="finger_joint" multiplier="1" offset="0"/>
+    <dynamics damping="0.1" friction="0.0"/>
+  </joint>
+  <link name="robotiq_85_right_inner_knuckle">
+    <visual>
+      <geometry>
+        <mesh filename="../meshes/robotiq_85/visual/robotiq_arg2f_85_inner_knuckle.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="../meshes/robotiq_85/collision/robotiq_arg2f_85_inner_knuckle.dae.convex.stl"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.029951"/>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <inertia ixx="0.000039" ixy="0.0" ixz="0.0" iyy="0.000031" iyz="0.0" izz="0.000015"/>
+    </inertial>
+  </link>
+
+  <!-- Right inner finger -->
+  <joint name="right_inner_finger_joint" type="revolute">
+    <parent link="robotiq_85_right_outer_knuckle"/>
+    <child link="robotiq_85_right_inner_finger"/>
+    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.09585"/>
+    <axis xyz="0 1 0"/>
+    <limit effort="50" lower="-0.8" upper="0.0" velocity="0.5"/>
+    <mimic joint="finger_joint" multiplier="-1" offset="0"/>
+    <dynamics damping="0.1" friction="0.0"/>
+  </joint>
+  <link name="robotiq_85_right_inner_finger">
+    <visual>
+      <geometry>
+        <mesh filename="../meshes/robotiq_85/visual/robotiq_arg2f_85_inner_finger.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="../meshes/robotiq_85/collision/robotiq_arg2f_85_inner_finger.dae.convex.stl"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.019555"/>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+      <inertia ixx="0.000003" ixy="0.0" ixz="0.0" iyy="0.000021" iyz="0.0" izz="0.000020"/>
+    </inertial>
+  </link>
+
+  <!-- Gripper tip (grasp reference point) -->
+  <joint name="gripper_tip_joint" type="fixed">
+    <parent link="robotiq_85_base_link"/>
+    <child link="gripper_tip_link"/>
+    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.145"/>
+  </joint>
+  <link name="gripper_tip_link"/>
+
+  <!-- ################################################
+  ########        Eye-in-Hand Camera           #######
+  #################################################### -->
+
+  <joint name="camera_joint" type="fixed">
+    <parent link="robotiq_85_base_link"/>
+    <child link="camera_link"/>
+    <!-- mounted above gripper base, pointing downward toward target -->
+    <origin rpy="0.0 1.57079632679 0.0" xyz="0.0 0.0 -0.05"/>
+  </joint>
+  <link name="camera_link">
+    <visual>
+      <geometry>
+        <box size="0.02 0.02 0.02"/>
+      </geometry>
+      <material name="CameraBlack">
+        <color rgba="0.1 0.1 0.1 1.0"/>
+      </material>
+    </visual>
+    <inertial>
+      <mass value="0.01"/>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <inertia ixx="0.0" ixy="0.0" ixz="0.0" iyy="0.0" iyz="0.0" izz="0.0"/>
+    </inertial>
+  </link>
 
 </robot>
+
 
